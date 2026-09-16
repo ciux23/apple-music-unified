@@ -1,0 +1,400 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <meta charset="utf-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Apple Music Downloader</title>
+    <style>
+        * { box-sizing: border-box; margin: 0; padding: 0; }
+        html, body { height: 100%; overflow: hidden; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
+            background: #0a0a0a;
+            color: #e8e8e8;
+            display: flex;
+            flex-direction: column;
+            height: 100vh;
+        }
+        header {
+            padding: 16px 24px;
+            background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
+            border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; justify-content: space-between;
+            flex-wrap: wrap; gap: 12px;
+        }
+        h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        .status-badge {
+            padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;
+            text-transform: uppercase; letter-spacing: 0.5px;
+        }
+        .status-idle { background: #2a2a2a; color: #888; }
+        .status-running { background: #1db95433; color: #1db954; animation: pulse 1.5s infinite; }
+        .status-done { background: #3fb95033; color: #3fb950; }
+        .status-error { background: #f8514933; color: #f85149; }
+        @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
+
+        .form-panel {
+            padding: 16px 24px;
+            background: #141414;
+            border-bottom: 1px solid #2a2a2a;
+            display: grid;
+            grid-template-columns: 1fr auto auto;
+            gap: 12px;
+            align-items: end;
+        }
+        .field { display: flex; flex-direction: column; gap: 6px; }
+        .field label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
+        input[type=text], select {
+            padding: 10px 14px; font-size: 14px; border-radius: 8px;
+            border: 1px solid #2a2a2a; background: #0a0a0a; color: #e8e8e8;
+            transition: border-color 0.15s; font-family: inherit;
+        }
+        input[type=text]:focus, select:focus { outline: none; border-color: #1db954; }
+        #url { width: 100%; }
+        button {
+            padding: 10px 20px; font-size: 14px; font-weight: 600;
+            background: #1db954; color: #fff; border: none; border-radius: 8px;
+            cursor: pointer; transition: all 0.15s; font-family: inherit;
+        }
+        button:hover:not(:disabled) { background: #1ed760; }
+        button:disabled { opacity: 0.5; cursor: not-allowed; }
+        button.secondary { background: #2a2a2a; color: #e8e8e8; }
+        button.secondary:hover:not(:disabled) { background: #3a3a3a; }
+
+        .progress-wrap {
+            padding: 12px 24px; background: #141414; border-bottom: 1px solid #2a2a2a;
+            display: flex; align-items: center; gap: 16px;
+        }
+        .progress-track {
+            flex: 1; height: 8px; background: #0a0a0a; border-radius: 4px;
+            overflow: hidden;
+        }
+        .progress-fill {
+            height: 100%; width: 0%;
+            background: linear-gradient(90deg, #1db954 0%, #1ed760 100%);
+            border-radius: 4px; transition: width 0.4s ease;
+            box-shadow: 0 0 10px #1db95466;
+        }
+        .progress-text { font-size: 13px; color: #888; min-width: 220px; text-align: right; font-variant-numeric: tabular-nums; }
+
+        .terminal-wrap { flex: 1; overflow: hidden; }
+        #log {
+            width: 100%; height: 100%; background: #050505; padding: 16px 24px;
+            overflow-y: auto;
+            font-family: "SF Mono", "Menlo", "Monaco", "Consolas", monospace;
+            font-size: 12.5px; line-height: 1.55; white-space: pre-wrap;
+            word-break: break-all; color: #b8b8b8;
+        }
+        #log::-webkit-scrollbar { width: 10px; }
+        #log::-webkit-scrollbar-track { background: #0a0a0a; }
+        #log::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 5px; }
+        .log-info { color: #58a6ff; }
+        .log-success { color: #3fb950; }
+        .log-error { color: #f85149; }
+        .log-warn { color: #d29922; }
+        .log-progress { color: #1db954; font-weight: 600; }
+        .log-sep { color: #1db954; font-weight: 600; }
+
+        /* Modal album selection */
+        #modal {
+            display: none; position: fixed; inset: 0;
+            background: rgba(0,0,0,0.85); z-index: 100;
+            align-items: center; justify-content: center;
+        }
+        #modal.open { display: flex; }
+        #modal-box {
+            background: #141414; border: 1px solid #2a2a2a; border-radius: 12px;
+            width: 720px; max-width: 92%; max-height: 88vh;
+            display: flex; flex-direction: column;
+            box-shadow: 0 20px 60px #000000cc;
+        }
+        #modal-head {
+            padding: 20px 24px; border-bottom: 1px solid #2a2a2a;
+            display: flex; justify-content: space-between; align-items: center;
+        }
+        #modal-head h2 { font-size: 16px; font-weight: 600; }
+        #modal-head .sub { font-size: 13px; color: #888; margin-top: 4px; }
+        #modal-body { padding: 8px 0; overflow-y: auto; flex: 1; }
+        #modal-body::-webkit-scrollbar { width: 10px; }
+        #modal-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 5px; }
+        .album-row {
+            display: flex; align-items: center; gap: 14px;
+            padding: 10px 24px; cursor: pointer;
+            transition: background 0.15s;
+        }
+        .album-row:hover { background: #1e1e1e; }
+        .album-row input[type=checkbox] {
+            width: 18px; height: 18px; accent-color: #1db954;
+            cursor: pointer; flex-shrink: 0;
+        }
+        .album-cover {
+            width: 48px; height: 48px; border-radius: 6px;
+            background: #2a2a2a; flex-shrink: 0; object-fit: cover;
+        }
+        .album-info { flex: 1; min-width: 0; }
+        .album-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .album-meta { font-size: 12px; color: #888; margin-top: 2px; }
+        #modal-foot {
+            padding: 16px 24px; border-top: 1px solid #2a2a2a;
+            display: flex; justify-content: space-between; align-items: center; gap: 12px;
+        }
+        #modal-foot .info { font-size: 13px; color: #888; }
+        #modal-foot .actions { display: flex; gap: 10px; }
+    </style>
+</head>
+<body>
+    <header>
+        <h1>🍎 Apple Music Downloader</h1>
+        <span id="status" class="status-badge status-idle">Idle</span>
+    </header>
+
+    <div class="form-panel">
+        <div class="field">
+            <label>URL Apple Music (brano, album, playlist o artista)</label>
+            <input id="url" type="text" placeholder="https://music.apple.com/it/album/..." />
+        </div>
+        <div class="field">
+            <label>Qualità</label>
+            <select id="quality">
+                <option value="lossless">Lossless</option>
+                <option value="hires">Hi-Res 24/192</option>
+                <option value="aac">AAC 256k</option>
+                <option value="atmos">Atmos</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>&nbsp;</label>
+            <button id="btn" onclick="start()">Download</button>
+        </div>
+    </div>
+
+    <div class="progress-wrap">
+        <div class="progress-track"><div id="progress" class="progress-fill"></div></div>
+        <div id="progressText" class="progress-text">Pronto</div>
+    </div>
+
+    <div class="terminal-wrap">
+        <pre id="log">In attesa di comandi…</pre>
+    </div>
+
+    <!-- Modal album selection -->
+    <div id="modal">
+        <div id="modal-box">
+            <div id="modal-head">
+                <div>
+                    <h2 id="modal-title">Seleziona gli album</h2>
+                    <div class="sub" id="modal-sub">—</div>
+                </div>
+                <button class="secondary" onclick="closeModal()">✕</button>
+            </div>
+            <div id="modal-body"></div>
+            <div id="modal-foot">
+                <div class="info" id="modal-count">0 album selezionati</div>
+                <div class="actions">
+                    <button class="secondary" onclick="toggleAll()">Tutti</button>
+                    <button class="secondary" onclick="closeModal()">Annulla</button>
+                    <button id="modal-download" onclick="confirmDownload()">Scarica selezionati</button>
+                </div>
+            </div>
+        </div>
+    </div>
+
+    <script>
+        let jid = null;
+        let autoScroll = true;
+        let pendingAlbums = [];
+
+        const logEl = document.getElementById('log');
+        logEl.addEventListener('scroll', () => {
+            autoScroll = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
+        });
+
+        function setStatus(s) {
+            const el = document.getElementById('status');
+            el.className = 'status-badge status-' + s;
+            el.textContent = { idle: 'Idle', running: 'Download', done: 'Completato', error: 'Errore' }[s] || s;
+        }
+        function setProgress(pct, text) {
+            const p = Math.max(0, Math.min(100, pct || 0));
+            document.getElementById('progress').style.width = p + '%';
+            document.getElementById('progressText').textContent = text || (p + '%');
+        }
+        function appendLog(text) {
+            if (!text) return;
+            const wasEmpty = logEl.textContent.startsWith('In attesa');
+            if (wasEmpty) logEl.textContent = '';
+            logEl.textContent += text;
+            if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
+        }
+
+        async function start() {
+            const url = document.getElementById('url').value.trim();
+            const quality = document.getElementById('quality').value;
+            if (!url) { alert('Incolla un URL'); return; }
+
+            // Se è un artista, mostra la modale di selezione
+            if (url.includes('/artist/')) {
+                await resolveArtist(url, quality);
+                return;
+            }
+            // Altrimenti download diretto
+            beginDownload([url], quality);
+        }
+
+        async function resolveArtist(url, quality) {
+            document.getElementById('btn').disabled = true;
+            setStatus('running');
+            logEl.textContent = '';
+            appendLog('[resolve] Risoluzione discografia artista in corso…\n');
+            setProgress(0, 'Risoluzione artista…');
+            try {
+                const r = await fetch('/resolve-artist', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({url})
+                });
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                if (!d.albums || d.albums.length === 0) {
+                    appendLog('[resolve] Nessun album trovato.\n');
+                    setStatus('error');
+                    setProgress(0, 'Nessun album');
+                    document.getElementById('btn').disabled = false;
+                    return;
+                }
+                pendingAlbums = d.albums;
+                showAlbumModal(d.albums, quality);
+                setProgress(0, `${d.albums.length} album trovati`);
+                setStatus('idle');
+            } catch (e) {
+                appendLog('[errore] ' + e.message + '\n');
+                setStatus('error');
+                setProgress(0, 'Errore');
+                document.getElementById('btn').disabled = false;
+            }
+        }
+
+        function showAlbumModal(albums, quality) {
+            document.getElementById('modal-sub').textContent = albums[0].url ? albums[0].name.split(' ')[0] : '';
+            const body = document.getElementById('modal-body');
+            body.innerHTML = '';
+            albums.forEach((a, i) => {
+                const row = document.createElement('label');
+                row.className = 'album-row';
+                const cb = document.createElement('input');
+                cb.type = 'checkbox';
+                cb.dataset.idx = i;
+                cb.checked = true;
+                cb.addEventListener('change', updateCount);
+                const img = document.createElement('img');
+                img.className = 'album-cover';
+                img.src = a.artwork || '';
+                img.onerror = () => { img.style.background = '#2a2a2a'; img.removeAttribute('src'); };
+                const info = document.createElement('div');
+                info.className = 'album-info';
+                const nm = document.createElement('div');
+                nm.className = 'album-name';
+                nm.textContent = a.name;
+                const meta = document.createElement('div');
+                meta.className = 'album-meta';
+                const date = a.release_date ? a.release_date.split('T')[0] : '';
+                meta.textContent = `${date} · ${a.track_count} tracce`;
+                info.appendChild(nm);
+                info.appendChild(meta);
+                row.appendChild(cb);
+                row.appendChild(img);
+                row.appendChild(info);
+                body.appendChild(row);
+            });
+            updateCount();
+            document.getElementById('modal').classList.add('open');
+        }
+
+        function updateCount() {
+            const checked = document.querySelectorAll('#modal-body input[type=checkbox]:checked').length;
+            document.getElementById('modal-count').textContent = `${checked} album selezionati`;
+            document.getElementById('modal-download').disabled = checked === 0;
+        }
+
+        function toggleAll() {
+            const boxes = document.querySelectorAll('#modal-body input[type=checkbox]');
+            const allChecked = Array.from(boxes).every(b => b.checked);
+            boxes.forEach(b => b.checked = !allChecked);
+            updateCount();
+        }
+
+        function closeModal() {
+            document.getElementById('modal').classList.remove('open');
+            document.getElementById('btn').disabled = false;
+        }
+
+        function confirmDownload() {
+            const boxes = document.querySelectorAll('#modal-body input[type=checkbox]:checked');
+            const urls = Array.from(boxes).map(b => pendingAlbums[parseInt(b.dataset.idx)].url).filter(Boolean);
+            if (urls.length === 0) { alert('Nessun album selezionato'); return; }
+            const quality = document.getElementById('quality').value;
+            document.getElementById('modal').classList.remove('open');
+            beginDownload(urls, quality);
+        }
+
+        async function beginDownload(urls, quality) {
+            document.getElementById('btn').disabled = true;
+            setStatus('running');
+            logEl.textContent = '';
+            setProgress(0, 'Avvio…');
+            autoScroll = true;
+            try {
+                const r = await fetch('/download', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({urls, quality})
+                });
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                jid = d.job_id;
+                poll();
+            } catch (e) {
+                appendLog('Errore: ' + e.message + '\n');
+                setStatus('error');
+                document.getElementById('btn').disabled = false;
+            }
+        }
+
+        async function poll() {
+            if (!jid) return;
+            try {
+                const r = await fetch('/log/' + jid);
+                const d = await r.json();
+                if (d.log !== undefined) {
+                    logEl.textContent = d.log || '';
+                    if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
+                }
+                let text = '';
+                if (d.total_urls > 1) {
+                    text = `Album ${d.current_index}/${d.total_urls}`;
+                }
+                if (d.total_tracks > 0) {
+                    if (text) text += ' · ';
+                    text += `Traccia ${d.track_num}/${d.total_tracks}`;
+                }
+                if (d.current_track_name) text += ` — ${d.current_track_name}`;
+                if (text) setProgress(d.percent, text);
+
+                if (d.status === 'running') {
+                    setTimeout(poll, 700);
+                } else {
+                    setStatus(d.status === 'done' ? 'done' : 'error');
+                    setProgress(100, 'Completato');
+                    document.getElementById('btn').disabled = false;
+                }
+            } catch (e) {
+                setTimeout(poll, 1500);
+            }
+        }
+
+        document.getElementById('url').addEventListener('keydown', e => {
+            if (e.key === 'Enter') start();
+        });
+    </script>
+</body>
+</html>
