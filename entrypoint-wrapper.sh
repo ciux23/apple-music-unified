@@ -9,12 +9,12 @@ PGID=${PGID:-1000}
 LOGIN_REQ="/app/.login-request"
 TOKEN_REQ="/app/.token-input"
 LOGIN_STATUS="/app/.login-status"
-TOKEN_DB_PATH="/app/rootfs/data/data/com.apple.android.music/files/mpl_db/kvs.sqlitedb"
 CONFIG_APMYX="/app/apmyx-config.yaml"
+WRAPPER_LOG="/tmp/wrapper.log"
+LOGIN_DONE_MARKER="/app/rootfs/data/.login_done"
 
 inject_token() {
-  local tok="$1"
-  python3 - "$tok" <<'PYEOF'
+  python3 - "$1" <<'PYEOF'
 import re, sys
 token = sys.argv[1]
 with open("/app/apmyx-config.yaml", "r") as f:
@@ -25,17 +25,13 @@ with open("/app/apmyx-config.yaml", "w") as f:
 PYEOF
 }
 
-# Se c'è un token passato come variabile d'ambiente, ha precedenza
 if [ -n "${MEDIA_USER_TOKEN}" ]; then
-  echo "[entrypoint] MEDIA_USER_TOKEN presente come env: inietto nel config."
   inject_token "$MEDIA_USER_TOKEN"
 fi
 
 ln -sf "$CONFIG_APMYX" /app/config.yaml
-
 mkdir -p "/app/rootfs/data/data/com.apple.android.music/files"
 
-echo "[entrypoint] Avvio web UI sulla porta 8080..."
 python3 /app/webui/app.py > /var/log/webui.log 2>&1 &
 WEBUI_PID=$!
 
@@ -53,74 +49,84 @@ cleanup() {
 }
 trap cleanup TERM INT EXIT
 
-# ---------------------------------------------------------------------------
-# Modalità servizio (token già presenti + token apmyx già iniettato)
-# ---------------------------------------------------------------------------
-if [ -f "$TOKEN_DB_PATH" ] && grep -q '^media-user-token: "[^"]\+"' "$CONFIG_APMYX"; then
-  echo "[entrypoint] Token wrapper e token apmyx presenti. Avvio servizio."
+# Modalità servizio se il marker di login completo esiste
+if [ -f "$LOGIN_DONE_MARKER" ] && grep -q '^media-user-token: "[^"]\+"' "$CONFIG_APMYX"; then
+  echo "[entrypoint] Login già completato. Avvio servizio."
   echo "ok" > "$LOGIN_STATUS"
   exec ./wrapper -H 0.0.0.0 -M 20020 "$@"
 fi
 
-# ---------------------------------------------------------------------------
-# Modalità setup
-# ---------------------------------------------------------------------------
-echo "[entrypoint] Setup richiesto. Attendo input dal wizard..."
-rm -f "$LOGIN_REQ" "$TOKEN_REQ"
+# Setup
+rm -f "$LOGIN_REQ" "$TOKEN_REQ" "$LOGIN_DONE_MARKER" "$WRAPPER_LOG"
+echo "waiting" > "$LOGIN_STATUS"
 
-# STEP 1: se manca il kvs.sqlitedb, aspetta email+password
-if [ ! -f "$TOKEN_DB_PATH" ]; then
-  echo "waiting" > "$LOGIN_STATUS"
-  echo "[entrypoint] Attendo email+password..."
-  while [ ! -f "$LOGIN_REQ" ]; do sleep 2; done
+echo "[entrypoint] Attendo email+password..."
+while [ ! -f "$LOGIN_REQ" ]; do sleep 2; done
+CREDS=$(cat "$LOGIN_REQ")
+EMAIL=$(echo "$CREDS" | cut -d: -f1)
+PASS=$(echo "$CREDS" | cut -d: -f2-)
+rm -f "$LOGIN_REQ"
+rm -f /app/rootfs/data/2fa.txt
 
-  CREDS=$(cat "$LOGIN_REQ")
-  EMAIL=$(echo "$CREDS" | cut -d: -f1)
-  PASS=$(echo "$CREDS" | cut -d: -f2-)
-  rm -f "$LOGIN_REQ"
+echo "[entrypoint] Avvio login in background..."
+./wrapper -L "${EMAIL}:${PASS}" -F -H 0.0.0.0 -M 20020 > "$WRAPPER_LOG" 2>&1 &
+WRAPPER_PID=$!
 
-  echo "[entrypoint] Credenziali ricevute, avvio login in background..."
-  echo "2fa" > "$LOGIN_STATUS"
-  rm -f /app/rootfs/data/2fa.txt
-
-  ./wrapper -L "${EMAIL}:${PASS}" -F -H 0.0.0.0 -M 20020 &
-  WRAPPER_PID=$!
-
-  for i in $(seq 1 60); do
-    if [ -f "$TOKEN_DB_PATH" ]; then
-      echo "[entrypoint] Login completato."
-      break
-    fi
-    sleep 2
-  done
-
-  if [ ! -f "$TOKEN_DB_PATH" ]; then
-    echo "[entrypoint] Login fallito (timeout)."
-    echo "error: login fallito" > "$LOGIN_STATUS"
-    kill $WRAPPER_PID 2>/dev/null || true
-    exit 1
+# Attendi prompt 2FA
+for i in $(seq 1 60); do
+  if grep -q "2FA: true" "$WRAPPER_LOG" 2>/dev/null; then
+    echo "[entrypoint] Prompt 2FA rilevato."
+    echo "2fa" > "$LOGIN_STATUS"
+    break
   fi
+  sleep 1
+done
+
+# Attendi codice 2FA dall'utente (90s)
+for i in $(seq 1 90); do
+  if [ -f /app/rootfs/data/2fa.txt ]; then
+    echo "[entrypoint] Codice 2FA ricevuto."
+    break
+  fi
+  sleep 1
+done
+
+if [ ! -f /app/rootfs/data/2fa.txt ]; then
+  echo "[entrypoint] Timeout 2FA."
+  echo "error: timeout 2FA" > "$LOGIN_STATUS"
+  kill $WRAPPER_PID 2>/dev/null || true
+  exit 1
 fi
 
-# STEP 2: chiedi il token se manca nel config apmyx
-if ! grep -q '^media-user-token: "[^"]\+"' "$CONFIG_APMYX"; then
-  echo "[entrypoint] In attesa del token apmyx dal wizard..."
-  echo "token" > "$LOGIN_STATUS"
-  while [ ! -f "$TOKEN_REQ" ]; do sleep 2; done
-  TOKEN_VAL=$(cat "$TOKEN_REQ")
-  rm -f "$TOKEN_REQ"
-  if [ -n "$TOKEN_VAL" ]; then
-    inject_token "$TOKEN_VAL"
-    echo "[entrypoint] Token apmyx iniettato."
+# Attendi listening (=login davvero completato)
+for i in $(seq 1 90); do
+  if grep -q "listening 0.0.0.0:10020" "$WRAPPER_LOG" 2>/dev/null; then
+    echo "[entrypoint] Login completato."
+    break
   fi
+  sleep 1
+done
+
+if ! grep -q "listening 0.0.0.0:10020" "$WRAPPER_LOG" 2>/dev/null; then
+  echo "[entrypoint] Login fallito."
+  echo "error: login fallito" > "$LOGIN_STATUS"
+  kill $WRAPPER_PID 2>/dev/null || true
+  exit 1
 fi
 
+# STEP 2: token apmyx
+echo "token" > "$LOGIN_STATUS"
+echo "[entrypoint] Attendo token apmyx dal wizard..."
+while [ ! -f "$TOKEN_REQ" ]; do sleep 2; done
+TOKEN_VAL=$(cat "$TOKEN_REQ")
+rm -f "$TOKEN_REQ"
+if [ -n "$TOKEN_VAL" ]; then
+  inject_token "$TOKEN_VAL"
+  echo "[entrypoint] Token apmyx iniettato."
+fi
+
+touch "$LOGIN_DONE_MARKER"
 echo "ok" > "$LOGIN_STATUS"
 
-# Se il wrapper di login è già in esecuzione, aspetta che termini (resta in listening)
-if [ -n "${WRAPPER_PID:-}" ] && kill -0 "$WRAPPER_PID" 2>/dev/null; then
-  wait $WRAPPER_PID
-else
-  # Altrimenti avvia il wrapper in servizio
-  exec ./wrapper -H 0.0.0.0 -M 20020 "$@"
-fi
+# Il wrapper è già in listening mode, resta in attesa
+wait $WRAPPER_PID
