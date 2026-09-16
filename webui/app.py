@@ -7,6 +7,7 @@ CONFIG_PATH = "/app/apmyx-config.yaml"
 LOGIN_REQ = "/app/.login-request"
 LOGIN_STATUS = "/app/.login-status"
 TWO_FA_FILE = "/app/rootfs/data/2fa.txt"
+TOKEN_REQ = "/app/.token-input"
 jobs = {}
 
 ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -147,6 +148,17 @@ def setup_2fa():
         return jsonify({"error": "Codice 2FA non valido"}), 400
     with open(TWO_FA_FILE, "w") as f:
         f.write(code)
+    return jsonify({"ok": True})
+
+@app.route("/setup/token", methods=["POST"])
+def setup_token():
+    data = request.json
+    token = data.get("token", "").strip()
+    if not token:
+        return jsonify({"error": "Token obbligatorio"}), 400
+    with open(TOKEN_REQ, "w") as f:
+        f.write(token)
+    os.chmod(TOKEN_REQ, 0o600)
     return jsonify({"ok": True})
 
 # ---------------------------------------------------------------------------

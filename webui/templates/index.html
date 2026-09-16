@@ -154,6 +154,16 @@
                 <button onclick="setup2FA()">Conferma</button>
                 <div id="setup-2fa-error" class="error"></div>
             </div>
+            <div class="setup-step" id="step-token">
+                <h2>Token Apple Music</h2>
+                <p class="sub">Incolla il tuo <code>media-user-token</code>. Lo trovi nei cookie di music.apple.com (DevTools → Application → Cookies → <code>media-user-token</code>).</p>
+                <div class="field">
+                    <label>media-user-token</label>
+                    <input id="setup-token" type="text" placeholder="0.Ajsn7LPq..." autocomplete="off" />
+                </div>
+                <button onclick="setupToken()">Salva token</button>
+                <div id="setup-token-error" class="error"></div>
+            </div>
             <div class="setup-step" id="step-wait">
                 <h2><span class="spinner"></span>Attendere…</h2>
                 <p class="sub" id="setup-wait-msg">Elaborazione in corso…</p>
@@ -237,6 +247,9 @@
                 } else if (s === '2fa') {
                     showStep('2fa');
                     document.getElementById('setup').classList.remove('hidden');
+                } else if (s === 'token') {
+                    showStep('token');
+                    document.getElementById('setup').classList.remove('hidden');
                 } else {
                     // in attesa di credenziali o sconosciuto: mostra login
                     showStep('login');
@@ -289,6 +302,8 @@
                 const d = await r.json();
                 if (d.status === '2fa') {
                     showStep('2fa');
+                } else if (d.status === 'token') {
+                    showStep('token');
                 } else if (d.status === 'ok') {
                     document.getElementById('setup').classList.add('hidden');
                 } else if (d.status === 'waiting') {
@@ -321,6 +336,32 @@
                 if (d.error) throw new Error(d.error);
                 showStep('wait');
                 document.getElementById('setup-wait-msg').textContent = 'Verifica del codice in corso…';
+                pollSetup();
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.classList.add('visible');
+            }
+        }
+
+        async function setupToken() {
+            const token = document.getElementById('setup-token').value.trim();
+            const errEl = document.getElementById('setup-token-error');
+            errEl.classList.remove('visible');
+            if (!token) {
+                errEl.textContent = 'Token obbligatorio';
+                errEl.classList.add('visible');
+                return;
+            }
+            try {
+                const r = await fetch('/setup/token', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({token})
+                });
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                showStep('wait');
+                document.getElementById('setup-wait-msg').textContent = 'Salvataggio token in corso…';
                 pollSetup();
             } catch (e) {
                 errEl.textContent = e.message;
@@ -508,6 +549,9 @@
         });
         document.getElementById('setup-2fa').addEventListener('keydown', e => {
             if (e.key === 'Enter') setup2FA();
+        });
+        document.getElementById('setup-token').addEventListener('keydown', e => {
+            if (e.key === 'Enter') setupToken();
         });
 
         // Avvio: verifica setup
