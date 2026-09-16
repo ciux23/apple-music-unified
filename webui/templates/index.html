@@ -9,20 +9,16 @@
         html, body { height: 100%; overflow: hidden; }
         body {
             font-family: -apple-system, BlinkMacSystemFont, "Segoe UI", sans-serif;
-            background: #0a0a0a;
-            color: #e8e8e8;
-            display: flex;
-            flex-direction: column;
-            height: 100vh;
+            background: #0a0a0a; color: #e8e8e8;
+            display: flex; flex-direction: column; height: 100vh;
         }
         header {
             padding: 16px 24px;
             background: linear-gradient(180deg, #1a1a1a 0%, #141414 100%);
             border-bottom: 1px solid #2a2a2a;
             display: flex; align-items: center; justify-content: space-between;
-            flex-wrap: wrap; gap: 12px;
         }
-        h1 { font-size: 18px; font-weight: 600; display: flex; align-items: center; gap: 10px; }
+        h1 { font-size: 18px; font-weight: 600; }
         .status-badge {
             padding: 4px 12px; border-radius: 12px; font-size: 12px; font-weight: 600;
             text-transform: uppercase; letter-spacing: 0.5px;
@@ -34,22 +30,17 @@
         @keyframes pulse { 0%,100% { opacity: 1; } 50% { opacity: 0.6; } }
 
         .form-panel {
-            padding: 16px 24px;
-            background: #141414;
-            border-bottom: 1px solid #2a2a2a;
-            display: grid;
-            grid-template-columns: 1fr auto auto;
-            gap: 12px;
-            align-items: end;
+            padding: 16px 24px; background: #141414; border-bottom: 1px solid #2a2a2a;
+            display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: end;
         }
         .field { display: flex; flex-direction: column; gap: 6px; }
         .field label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
-        input[type=text], select {
+        input[type=text], input[type=password], select {
             padding: 10px 14px; font-size: 14px; border-radius: 8px;
             border: 1px solid #2a2a2a; background: #0a0a0a; color: #e8e8e8;
-            transition: border-color 0.15s; font-family: inherit;
+            font-family: inherit; transition: border-color 0.15s;
         }
-        input[type=text]:focus, select:focus { outline: none; border-color: #1db954; }
+        input:focus, select:focus { outline: none; border-color: #1db954; }
         #url { width: 100%; }
         button {
             padding: 10px 20px; font-size: 14px; font-weight: 600;
@@ -65,10 +56,7 @@
             padding: 12px 24px; background: #141414; border-bottom: 1px solid #2a2a2a;
             display: flex; align-items: center; gap: 16px;
         }
-        .progress-track {
-            flex: 1; height: 8px; background: #0a0a0a; border-radius: 4px;
-            overflow: hidden;
-        }
+        .progress-track { flex: 1; height: 8px; background: #0a0a0a; border-radius: 4px; overflow: hidden; }
         .progress-fill {
             height: 100%; width: 0%;
             background: linear-gradient(90deg, #1db954 0%, #1ed760 100%);
@@ -86,63 +74,93 @@
             word-break: break-all; color: #b8b8b8;
         }
         #log::-webkit-scrollbar { width: 10px; }
-        #log::-webkit-scrollbar-track { background: #0a0a0a; }
         #log::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 5px; }
-        .log-info { color: #58a6ff; }
-        .log-success { color: #3fb950; }
-        .log-error { color: #f85149; }
-        .log-warn { color: #d29922; }
-        .log-progress { color: #1db954; font-weight: 600; }
-        .log-sep { color: #1db954; font-weight: 600; }
 
-        /* Modal album selection */
-        #modal {
-            display: none; position: fixed; inset: 0;
-            background: rgba(0,0,0,0.85); z-index: 100;
-            align-items: center; justify-content: center;
-        }
+        #modal { display: none; position: fixed; inset: 0; background: rgba(0,0,0,0.85); z-index: 100; align-items: center; justify-content: center; }
         #modal.open { display: flex; }
         #modal-box {
             background: #141414; border: 1px solid #2a2a2a; border-radius: 12px;
-            width: 720px; max-width: 92%; max-height: 88vh;
-            display: flex; flex-direction: column;
+            width: 720px; max-width: 92%; max-height: 88vh; display: flex; flex-direction: column;
             box-shadow: 0 20px 60px #000000cc;
         }
-        #modal-head {
-            padding: 20px 24px; border-bottom: 1px solid #2a2a2a;
-            display: flex; justify-content: space-between; align-items: center;
-        }
+        #modal-head { padding: 20px 24px; border-bottom: 1px solid #2a2a2a; display: flex; justify-content: space-between; align-items: center; }
         #modal-head h2 { font-size: 16px; font-weight: 600; }
-        #modal-head .sub { font-size: 13px; color: #888; margin-top: 4px; }
         #modal-body { padding: 8px 0; overflow-y: auto; flex: 1; }
-        #modal-body::-webkit-scrollbar { width: 10px; }
-        #modal-body::-webkit-scrollbar-thumb { background: #2a2a2a; border-radius: 5px; }
-        .album-row {
-            display: flex; align-items: center; gap: 14px;
-            padding: 10px 24px; cursor: pointer;
-            transition: background 0.15s;
-        }
+        .album-row { display: flex; align-items: center; gap: 14px; padding: 10px 24px; cursor: pointer; transition: background 0.15s; }
         .album-row:hover { background: #1e1e1e; }
-        .album-row input[type=checkbox] {
-            width: 18px; height: 18px; accent-color: #1db954;
-            cursor: pointer; flex-shrink: 0;
-        }
-        .album-cover {
-            width: 48px; height: 48px; border-radius: 6px;
-            background: #2a2a2a; flex-shrink: 0; object-fit: cover;
-        }
+        .album-row input[type=checkbox] { width: 18px; height: 18px; accent-color: #1db954; cursor: pointer; flex-shrink: 0; }
+        .album-cover { width: 48px; height: 48px; border-radius: 6px; background: #2a2a2a; flex-shrink: 0; object-fit: cover; }
         .album-info { flex: 1; min-width: 0; }
         .album-name { font-size: 14px; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .album-meta { font-size: 12px; color: #888; margin-top: 2px; }
-        #modal-foot {
-            padding: 16px 24px; border-top: 1px solid #2a2a2a;
-            display: flex; justify-content: space-between; align-items: center; gap: 12px;
-        }
+        #modal-foot { padding: 16px 24px; border-top: 1px solid #2a2a2a; display: flex; justify-content: space-between; align-items: center; gap: 12px; }
         #modal-foot .info { font-size: 13px; color: #888; }
         #modal-foot .actions { display: flex; gap: 10px; }
+
+        /* Setup wizard */
+        #setup {
+            position: fixed; inset: 0; background: #0a0a0a; z-index: 200;
+            display: flex; align-items: center; justify-content: center;
+        }
+        #setup.hidden { display: none; }
+        #setup-box {
+            background: #141414; border: 1px solid #2a2a2a; border-radius: 12px;
+            width: 460px; max-width: 92%; padding: 32px;
+            box-shadow: 0 20px 60px #000000cc;
+        }
+        #setup-box h2 { font-size: 22px; font-weight: 600; margin-bottom: 8px; }
+        #setup-box p.sub { color: #888; font-size: 14px; margin-bottom: 24px; line-height: 1.5; }
+        #setup-box .field { margin-bottom: 16px; }
+        #setup-box .field input { width: 100%; }
+        #setup-box button { width: 100%; padding: 12px; font-size: 15px; }
+        #setup-box .error { color: #f85149; font-size: 13px; margin-top: 12px; display: none; }
+        #setup-box .error.visible { display: block; }
+        .setup-step { display: none; }
+        .setup-step.active { display: block; }
+        .spinner {
+            display: inline-block; width: 14px; height: 14px;
+            border: 2px solid #1db954; border-top-color: transparent;
+            border-radius: 50%; animation: spin 1s linear infinite;
+            vertical-align: middle; margin-right: 8px;
+        }
+        @keyframes spin { to { transform: rotate(360deg); } }
     </style>
 </head>
 <body>
+    <!-- Setup Wizard -->
+    <div id="setup">
+        <div id="setup-box">
+            <div class="setup-step active" id="step-login">
+                <h2>🍎 Setup</h2>
+                <p class="sub">Primo avvio: inserisci le credenziali Apple ID per generare i token. Verranno salvati localmente nel volume <code>wrapper-data</code>.</p>
+                <div class="field">
+                    <label>Apple ID (email)</label>
+                    <input id="setup-email" type="text" placeholder="tua@icloud.com" autocomplete="username" />
+                </div>
+                <div class="field">
+                    <label>Password</label>
+                    <input id="setup-pass" type="password" placeholder="••••••••" autocomplete="current-password" />
+                </div>
+                <button id="setup-btn" onclick="setupLogin()">Accedi</button>
+                <div id="setup-error" class="error"></div>
+            </div>
+            <div class="setup-step" id="step-2fa">
+                <h2>Verifica 2FA</h2>
+                <p class="sub">Apple ha inviato un codice a 6 cifre ai tuoi dispositivi. Inseriscilo qui entro 60 secondi.</p>
+                <div class="field">
+                    <label>Codice a 6 cifre</label>
+                    <input id="setup-2fa" type="text" placeholder="123456" maxlength="6" inputmode="numeric" autocomplete="one-time-code" />
+                </div>
+                <button onclick="setup2FA()">Conferma</button>
+                <div id="setup-2fa-error" class="error"></div>
+            </div>
+            <div class="setup-step" id="step-wait">
+                <h2><span class="spinner"></span>Attendere…</h2>
+                <p class="sub" id="setup-wait-msg">Elaborazione in corso…</p>
+            </div>
+        </div>
+    </div>
+
     <header>
         <h1>🍎 Apple Music Downloader</h1>
         <span id="status" class="status-badge status-idle">Idle</span>
@@ -177,13 +195,11 @@
         <pre id="log">In attesa di comandi…</pre>
     </div>
 
-    <!-- Modal album selection -->
     <div id="modal">
         <div id="modal-box">
             <div id="modal-head">
                 <div>
                     <h2 id="modal-title">Seleziona gli album</h2>
-                    <div class="sub" id="modal-sub">—</div>
                 </div>
                 <button class="secondary" onclick="closeModal()">✕</button>
             </div>
@@ -193,7 +209,7 @@
                 <div class="actions">
                     <button class="secondary" onclick="toggleAll()">Tutti</button>
                     <button class="secondary" onclick="closeModal()">Annulla</button>
-                    <button id="modal-download" onclick="confirmDownload()">Scarica selezionati</button>
+                    <button id="modal-download" onclick="confirmDownload()">Scarica</button>
                 </div>
             </div>
         </div>
@@ -203,7 +219,118 @@
         let jid = null;
         let autoScroll = true;
         let pendingAlbums = [];
+        let currentStep = 'login';
 
+        // -------------------------------------------------------------------
+        // Setup wizard
+        // -------------------------------------------------------------------
+        async function checkSetup() {
+            try {
+                const r = await fetch('/setup/status');
+                const d = await r.json();
+                const s = d.status;
+                if (s === 'ok') {
+                    document.getElementById('setup').classList.add('hidden');
+                } else if (s === 'waiting') {
+                    showStep('login');
+                    document.getElementById('setup').classList.remove('hidden');
+                } else if (s === '2fa') {
+                    showStep('2fa');
+                    document.getElementById('setup').classList.remove('hidden');
+                } else {
+                    // in attesa di credenziali o sconosciuto: mostra login
+                    showStep('login');
+                    document.getElementById('setup').classList.remove('hidden');
+                }
+            } catch (e) {
+                setTimeout(checkSetup, 2000);
+            }
+        }
+
+        function showStep(id) {
+            currentStep = id;
+            document.querySelectorAll('.setup-step').forEach(el => el.classList.remove('active'));
+            document.getElementById('step-' + id).classList.add('active');
+        }
+
+        async function setupLogin() {
+            const email = document.getElementById('setup-email').value.trim();
+            const password = document.getElementById('setup-pass').value;
+            const errEl = document.getElementById('setup-error');
+            errEl.classList.remove('visible');
+            if (!email || !password) {
+                errEl.textContent = 'Email e password obbligatorie';
+                errEl.classList.add('visible');
+                return;
+            }
+            document.getElementById('setup-btn').disabled = true;
+            try {
+                const r = await fetch('/setup/login', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({email, password})
+                });
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                showStep('wait');
+                document.getElementById('setup-wait-msg').textContent = 'Attendo risposta da Apple…';
+                // Aspetta che lo stato passi a '2fa' o 'ok'
+                pollSetup();
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.classList.add('visible');
+                document.getElementById('setup-btn').disabled = false;
+            }
+        }
+
+        async function pollSetup() {
+            try {
+                const r = await fetch('/setup/status');
+                const d = await r.json();
+                if (d.status === '2fa') {
+                    showStep('2fa');
+                } else if (d.status === 'ok') {
+                    document.getElementById('setup').classList.add('hidden');
+                } else if (d.status === 'waiting') {
+                    // l'entrypoint non ha ancora ricevuto la richiesta
+                    setTimeout(pollSetup, 1500);
+                } else {
+                    setTimeout(pollSetup, 1500);
+                }
+            } catch (e) {
+                setTimeout(pollSetup, 2000);
+            }
+        }
+
+        async function setup2FA() {
+            const code = document.getElementById('setup-2fa').value.trim();
+            const errEl = document.getElementById('setup-2fa-error');
+            errEl.classList.remove('visible');
+            if (!code || !/^\d{6}$/.test(code)) {
+                errEl.textContent = 'Inserisci un codice a 6 cifre';
+                errEl.classList.add('visible');
+                return;
+            }
+            try {
+                const r = await fetch('/setup/2fa', {
+                    method:'POST',
+                    headers:{'Content-Type':'application/json'},
+                    body: JSON.stringify({code})
+                });
+                const d = await r.json();
+                if (d.error) throw new Error(d.error);
+                showStep('wait');
+                document.getElementById('setup-wait-msg').textContent = 'Verifica del codice in corso…';
+                pollSetup();
+            } catch (e) {
+                errEl.textContent = e.message;
+                errEl.classList.add('visible');
+            }
+        }
+
+        // -------------------------------------------------------------------
+        // App principale
+        // -------------------------------------------------------------------
         const logEl = document.getElementById('log');
         logEl.addEventListener('scroll', () => {
             autoScroll = logEl.scrollHeight - logEl.scrollTop - logEl.clientHeight < 40;
@@ -219,25 +346,15 @@
             document.getElementById('progress').style.width = p + '%';
             document.getElementById('progressText').textContent = text || (p + '%');
         }
-        function appendLog(text) {
-            if (!text) return;
-            const wasEmpty = logEl.textContent.startsWith('In attesa');
-            if (wasEmpty) logEl.textContent = '';
-            logEl.textContent += text;
-            if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
-        }
 
         async function start() {
             const url = document.getElementById('url').value.trim();
             const quality = document.getElementById('quality').value;
             if (!url) { alert('Incolla un URL'); return; }
-
-            // Se è un artista, mostra la modale di selezione
             if (url.includes('/artist/')) {
                 await resolveArtist(url, quality);
                 return;
             }
-            // Altrimenti download diretto
             beginDownload([url], quality);
         }
 
@@ -245,7 +362,6 @@
             document.getElementById('btn').disabled = true;
             setStatus('running');
             logEl.textContent = '';
-            appendLog('[resolve] Risoluzione discografia artista in corso…\n');
             setProgress(0, 'Risoluzione artista…');
             try {
                 const r = await fetch('/resolve-artist', {
@@ -256,26 +372,24 @@
                 const d = await r.json();
                 if (d.error) throw new Error(d.error);
                 if (!d.albums || d.albums.length === 0) {
-                    appendLog('[resolve] Nessun album trovato.\n');
                     setStatus('error');
                     setProgress(0, 'Nessun album');
                     document.getElementById('btn').disabled = false;
                     return;
                 }
                 pendingAlbums = d.albums;
-                showAlbumModal(d.albums, quality);
+                showAlbumModal(d.albums);
                 setProgress(0, `${d.albums.length} album trovati`);
                 setStatus('idle');
             } catch (e) {
-                appendLog('[errore] ' + e.message + '\n');
+                logEl.textContent = '[errore] ' + e.message;
                 setStatus('error');
                 setProgress(0, 'Errore');
                 document.getElementById('btn').disabled = false;
             }
         }
 
-        function showAlbumModal(albums, quality) {
-            document.getElementById('modal-sub').textContent = albums[0].url ? albums[0].name.split(' ')[0] : '';
+        function showAlbumModal(albums) {
             const body = document.getElementById('modal-body');
             body.innerHTML = '';
             albums.forEach((a, i) => {
@@ -315,19 +429,16 @@
             document.getElementById('modal-count').textContent = `${checked} album selezionati`;
             document.getElementById('modal-download').disabled = checked === 0;
         }
-
         function toggleAll() {
             const boxes = document.querySelectorAll('#modal-body input[type=checkbox]');
             const allChecked = Array.from(boxes).every(b => b.checked);
             boxes.forEach(b => b.checked = !allChecked);
             updateCount();
         }
-
         function closeModal() {
             document.getElementById('modal').classList.remove('open');
             document.getElementById('btn').disabled = false;
         }
-
         function confirmDownload() {
             const boxes = document.querySelectorAll('#modal-body input[type=checkbox]:checked');
             const urls = Array.from(boxes).map(b => pendingAlbums[parseInt(b.dataset.idx)].url).filter(Boolean);
@@ -354,7 +465,7 @@
                 jid = d.job_id;
                 poll();
             } catch (e) {
-                appendLog('Errore: ' + e.message + '\n');
+                logEl.textContent = 'Errore: ' + e.message;
                 setStatus('error');
                 document.getElementById('btn').disabled = false;
             }
@@ -370,31 +481,39 @@
                     if (autoScroll) logEl.scrollTop = logEl.scrollHeight;
                 }
                 let text = '';
-                if (d.total_urls > 1) {
-                    text = `Album ${d.current_index}/${d.total_urls}`;
-                }
+                if (d.total_urls > 1) text = `Album ${d.current_index}/${d.total_urls}`;
                 if (d.total_tracks > 0) {
                     if (text) text += ' · ';
                     text += `Traccia ${d.track_num}/${d.total_tracks}`;
                 }
                 if (d.current_track_name) text += ` — ${d.current_track_name}`;
                 if (text) setProgress(d.percent, text);
-
-                if (d.status === 'running') {
-                    setTimeout(poll, 700);
-                } else {
+                if (d.status === 'running') setTimeout(poll, 700);
+                else {
                     setStatus(d.status === 'done' ? 'done' : 'error');
                     setProgress(100, 'Completato');
                     document.getElementById('btn').disabled = false;
                 }
-            } catch (e) {
-                setTimeout(poll, 1500);
-            }
+            } catch (e) { setTimeout(poll, 1500); }
         }
 
         document.getElementById('url').addEventListener('keydown', e => {
             if (e.key === 'Enter') start();
         });
+        document.getElementById('setup-email').addEventListener('keydown', e => {
+            if (e.key === 'Enter') document.getElementById('setup-pass').focus();
+        });
+        document.getElementById('setup-pass').addEventListener('keydown', e => {
+            if (e.key === 'Enter') setupLogin();
+        });
+        document.getElementById('setup-2fa').addEventListener('keydown', e => {
+            if (e.key === 'Enter') setup2FA();
+        });
+
+        // Avvio: verifica setup
+        checkSetup();
+        // Ricontrolla periodicamente (caso 2FA)
+        setInterval(checkSetup, 5000);
     </script>
 </body>
 </html>

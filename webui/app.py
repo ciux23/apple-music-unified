@@ -1,9 +1,12 @@
 from flask import Flask, render_template, request, jsonify
-import subprocess, threading, uuid, os, pty, select, re, json
+import subprocess, threading, uuid, os, pty, select, re, json, time
 
 app = Flask(__name__)
 APMYX_BIN = "/app/apmyx"
 CONFIG_PATH = "/app/apmyx-config.yaml"
+LOGIN_REQ = "/app/.login-request"
+LOGIN_STATUS = "/app/.login-status"
+TWO_FA_FILE = "/app/rootfs/data/2fa.txt"
 jobs = {}
 
 ANSI_RE = re.compile(r'\x1B(?:[@-Z\\-_]|\[[0-?]*[ -/]*[@-~])')
@@ -51,7 +54,6 @@ def parse_progress(line, job):
     elif t == "track_start":
         job["track_num"] = data.get("track_num", 0)
         job["total_tracks"] = data.get("total_tracks", job.get("total_tracks", 0))
-        job["total_bytes"] = data.get("total_bytes", 0)
         job["current_track_name"] = data.get("name", "")
     elif t == "track_complete":
         completed = data.get("track_num", 0)
@@ -78,32 +80,19 @@ def reader(job_id, master_fd, proc):
                     buf = buf.split("\n")[-1]
                 except OSError:
                     break
-        while True:
-            r, _, _ = select.select([master_fd], [], [], 0.2)
-            if not r: break
-            try:
-                data = os.read(master_fd, 4096)
-                if not data: break
-                text = strip_ansi(data.decode(errors="replace"))
-                job["log"] += text
-            except OSError:
-                break
     finally:
         job["status"] = "done"
         job["percent"] = 100
 
 def run_apmyx(job_id, urls, quality):
-    """urls è una lista di URL album/song da scaricare in sequenza."""
     jobs[job_id] = {
         "status": "running", "log": "", "master_fd": None, "proc": None,
         "percent": 0, "track_num": 0, "total_tracks": 0,
-        "current_track_name": "", "total_bytes": 0,
-        "current_index": 0, "total_urls": len(urls),
+        "current_track_name": "", "current_index": 0, "total_urls": len(urls),
     }
     try:
         update_quality(quality)
         jobs[job_id]["log"] += f"[config] quality={quality}, {len(urls)} URL(s)\n\n"
-
         for i, url in enumerate(urls):
             jobs[job_id]["current_index"] = i + 1
             jobs[job_id]["log"] += f"\n=== [{i+1}/{len(urls)}] {url} ===\n"
@@ -115,8 +104,7 @@ def run_apmyx(job_id, urls, quality):
             env = {**os.environ, "TERM": "dumb", "NO_COLOR": "1",
                    "COLUMNS": "160", "LINES": "60"}
             proc = subprocess.Popen(args, stdin=slave_fd, stdout=slave_fd,
-                                    stderr=slave_fd, close_fds=True, env=env,
-                                    cwd="/app")
+                                    stderr=slave_fd, close_fds=True, env=env, cwd="/app")
             os.close(slave_fd)
             jobs[job_id]["master_fd"] = master_fd
             jobs[job_id]["proc"] = proc
@@ -125,13 +113,51 @@ def run_apmyx(job_id, urls, quality):
         jobs[job_id]["log"] += f"\n[ERRORE] {e}"
         jobs[job_id]["status"] = "error"
 
+# ---------------------------------------------------------------------------
+# Setup wizard endpoints
+# ---------------------------------------------------------------------------
+@app.route("/setup/status")
+def setup_status():
+    """Ritorna lo stato del wizard: waiting, 2fa, ok, error."""
+    status = "waiting"
+    if os.path.isfile(LOGIN_STATUS):
+        with open(LOGIN_STATUS) as f:
+            status = f.read().strip()
+    return jsonify({"status": status})
+
+@app.route("/setup/login", methods=["POST"])
+def setup_login():
+    data = request.json
+    email = data.get("email", "").strip()
+    password = data.get("password", "")
+    if not email or not password:
+        return jsonify({"error": "Email e password obbligatorie"}), 400
+    # Sostituiamo eventuali ":" nella password (il formato interno è email:password)
+    # Usiamo il primo ":" come separatore: email non contiene ":"
+    with open(LOGIN_REQ, "w") as f:
+        f.write(f"{email}:{password}")
+    os.chmod(LOGIN_REQ, 0o600)
+    return jsonify({"ok": True})
+
+@app.route("/setup/2fa", methods=["POST"])
+def setup_2fa():
+    data = request.json
+    code = data.get("code", "").strip()
+    if not code or not code.isdigit():
+        return jsonify({"error": "Codice 2FA non valido"}), 400
+    with open(TWO_FA_FILE, "w") as f:
+        f.write(code)
+    return jsonify({"ok": True})
+
+# ---------------------------------------------------------------------------
+# Application endpoints
+# ---------------------------------------------------------------------------
 @app.route("/")
 def index():
     return render_template("index.html")
 
 @app.route("/resolve-artist", methods=["POST"])
 def resolve_artist():
-    """Risolve un URL artista nella lista album."""
     data = request.json
     url = data.get("url", "").strip()
     if not url:
@@ -145,7 +171,7 @@ def resolve_artist():
         start = out.find("AMDL_JSON_START")
         end = out.find("AMDL_JSON_END")
         if start == -1 or end == -1:
-            return jsonify({"error": "Risposta non valida dal backend", "raw": out[:500]}), 500
+            return jsonify({"error": "Risposta non valida dal backend"}), 500
         json_str = out[start + len("AMDL_JSON_START"):end].strip()
         albums_raw = json.loads(json_str)
         albums = []
@@ -160,8 +186,6 @@ def resolve_artist():
                 "artwork": attrs.get("artwork", {}).get("url", "").replace("{w}x{h}", "300x300"),
             })
         return jsonify({"albums": albums})
-    except subprocess.TimeoutExpired:
-        return jsonify({"error": "Timeout nella risoluzione"}), 504
     except Exception as e:
         return jsonify({"error": str(e)}), 500
 
@@ -179,28 +203,13 @@ def download():
     threading.Thread(target=run_apmyx, args=(jid, urls, quality), daemon=True).start()
     return jsonify({"job_id": jid})
 
-@app.route("/send", methods=["POST"])
-def send():
-    data = request.json
-    jid = data.get("job_id")
-    text = data.get("text", "")
-    j = jobs.get(jid)
-    if not j or j.get("master_fd") is None:
-        return jsonify({"error": "processo non attivo"}), 404
-    try:
-        os.write(j["master_fd"], (text + "\n").encode())
-        return jsonify({"ok": True})
-    except OSError as e:
-        return jsonify({"error": str(e)}), 500
-
 @app.route("/log/<jid>")
 def log(jid):
     j = jobs.get(jid)
     if not j:
         return jsonify({"error": "job non trovato"}), 404
     return jsonify({
-        "status": j["status"],
-        "log": j["log"],
+        "status": j["status"], "log": j["log"],
         "percent": j.get("percent", 0),
         "track_num": j.get("track_num", 0),
         "total_tracks": j.get("total_tracks", 0),
