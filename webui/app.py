@@ -86,15 +86,14 @@ def reader(job_id, master_fd, proc):
         job["percent"] = 100
 
 
-def convert_to_flac(job_id, keep_alac=False):
-    """Converte tutti i .m4a in /downloads/ALAC/ in FLAC dentro /downloads/FLAC/.
-    Preserva struttura, tag e copertina. Se keep_alac è False, cancella gli .m4a."""
+def convert_to_flac(job_id, files, keep_alac=False):
+    """Converte i file .m4a passati in FLAC dentro /downloads/FLAC/.
+    Preserva struttura, tag e copertina (ridimensionata per il limite FLAC di 16 MB)."""
     jobs[job_id]["log"] += "\n[FLAC] Conversione in corso...\n"
     src_root = "/downloads/ALAC"
     dst_root = "/downloads/FLAC"
-    files = glob.glob(os.path.join(src_root, "**", "*.m4a"), recursive=True)
     if not files:
-        jobs[job_id]["log"] += "[FLAC] Nessun file da convertire.\n"
+        jobs[job_id]["log"] += "[FLAC] Nessun file nuovo da convertire.\n"
         return
     total = len(files)
     jobs[job_id]["log"] += f"[FLAC] {total} file da convertire.\n"
@@ -102,11 +101,13 @@ def convert_to_flac(job_id, keep_alac=False):
         rel = os.path.relpath(src, src_root)
         dst = os.path.join(dst_root, os.path.splitext(rel)[0] + ".flac")
         os.makedirs(os.path.dirname(dst), exist_ok=True)
-        # ffmpeg: copia audio in flac, copia tag e copertina
+        # ffmpeg: audio in flac, copertina ridimensionata a 1400x1400 mjpeg per stare sotto il limite 16 MB
         cmd = [
             "ffmpeg", "-y", "-i", src,
-            "-map", "0:a", "-map", "0:v?", "-c:v", "copy",
+            "-map", "0:a", "-map", "0:v?",
             "-c:a", "flac", "-compression_level", "8",
+            "-c:v", "mjpeg", "-q:v", "3", "-vf", "scale=1400:1400:force_original_aspect_ratio=decrease",
+            "-disposition:v", "attached_pic",
             "-map_metadata", "0",
             dst
         ]
@@ -130,7 +131,6 @@ def convert_to_flac(job_id, keep_alac=False):
         except OSError:
             pass
     if not keep_alac:
-        # Se ALAC è vuota, rimuovila
         try:
             if os.path.isdir(src_root) and not os.listdir(src_root):
                 os.rmdir(src_root)
@@ -146,7 +146,10 @@ def run_apmyx(job_id, urls, quality, output_format='alac'):
     }
     try:
         update_quality(quality)
-        jobs[job_id]["log"] += f"[config] quality={quality}, {len(urls)} URL(s)\n\n"
+        jobs[job_id]["log"] += f"[config] quality={quality}, format={output_format}, {len(urls)} URL(s)\n\n"
+        # Snapshot dei file .m4a esistenti prima del download
+        existing = set(glob.glob(os.path.join("/downloads/ALAC", "**", "*.m4a"), recursive=True))
+        jobs[job_id]["log"] += f"[config] file esistenti in ALAC: {len(existing)}\n\n"
         for i, url in enumerate(urls):
             jobs[job_id]["current_index"] = i + 1
             jobs[job_id]["log"] += f"\n=== [{i+1}/{len(urls)}] {url} ===\n"
@@ -163,10 +166,13 @@ def run_apmyx(job_id, urls, quality, output_format='alac'):
             jobs[job_id]["master_fd"] = master_fd
             jobs[job_id]["proc"] = proc
             reader(job_id, master_fd, proc)
-        # Conversione FLAC se richiesta
+        # Conversione FLAC se richiesta - solo file nuovi
         if output_format in ("flac", "alac+flac"):
             keep = (output_format == "alac+flac")
-            convert_to_flac(job_id, keep_alac=keep)
+            current = set(glob.glob(os.path.join("/downloads/ALAC", "**", "*.m4a"), recursive=True))
+            new_files = sorted(current - existing)
+            jobs[job_id]["log"] += f"\n[FLAC] {len(new_files)} file nuovi da convertire.\n"
+            convert_to_flac(job_id, new_files, keep_alac=keep)
     except Exception as e:
         jobs[job_id]["log"] += f"\n[ERRORE] {e}"
         jobs[job_id]["status"] = "error"
