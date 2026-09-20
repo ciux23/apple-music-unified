@@ -131,11 +131,13 @@ def convert_to_flac(job_id, files, keep_alac=False):
         except OSError:
             pass
     if not keep_alac:
+        # Cancella completamente la cartella ALAC: è solo un volano per la conversione
         try:
-            if os.path.isdir(src_root) and not os.listdir(src_root):
-                os.rmdir(src_root)
-        except OSError:
-            pass
+            if os.path.isdir(src_root):
+                shutil.rmtree(src_root)
+                jobs[job_id]["log"] += "[FLAC] Cartella ALAC rimossa (volano non più necessario).\n"
+        except OSError as e:
+            jobs[job_id]["log"] += f"[FLAC] Impossibile rimuovere ALAC: {e}\n"
     jobs[job_id]["log"] += "[FLAC] Conversione completata.\n"
 
 def run_apmyx(job_id, urls, quality, output_format='alac'):
