@@ -230,6 +230,7 @@
         let autoScroll = true;
         let pendingAlbums = [];
         let currentStep = 'login';
+        let setupBusy = false;
 
         // -------------------------------------------------------------------
         // Setup wizard
@@ -262,11 +263,13 @@
 
         function showStep(id) {
             currentStep = id;
+            setupBusy = false;
             document.querySelectorAll('.setup-step').forEach(el => el.classList.remove('active'));
             document.getElementById('step-' + id).classList.add('active');
         }
 
         async function setupLogin() {
+            if (setupBusy) return;
             const email = document.getElementById('setup-email').value.trim();
             const password = document.getElementById('setup-pass').value;
             const errEl = document.getElementById('setup-error');
@@ -276,7 +279,9 @@
                 errEl.classList.add('visible');
                 return;
             }
+            setupBusy = true;
             document.getElementById('setup-btn').disabled = true;
+            document.getElementById('setup-btn').textContent = 'Invio in corso…';
             try {
                 const r = await fetch('/setup/login', {
                     method:'POST',
@@ -318,6 +323,7 @@
         }
 
         async function setup2FA() {
+            if (setupBusy) return;
             const code = document.getElementById('setup-2fa').value.trim();
             const errEl = document.getElementById('setup-2fa-error');
             errEl.classList.remove('visible');
@@ -326,6 +332,7 @@
                 errEl.classList.add('visible');
                 return;
             }
+            setupBusy = true;
             try {
                 const r = await fetch('/setup/2fa', {
                     method:'POST',
@@ -336,6 +343,8 @@
                 if (d.error) throw new Error(d.error);
                 showStep('wait');
                 document.getElementById('setup-wait-msg').textContent = 'Verifica del codice in corso…';
+                const btn = document.querySelector('#step-2fa button');
+                if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
                 pollSetup();
             } catch (e) {
                 errEl.textContent = e.message;
@@ -344,6 +353,7 @@
         }
 
         async function setupToken() {
+            if (setupBusy) return;
             const token = document.getElementById('setup-token').value.trim();
             const errEl = document.getElementById('setup-token-error');
             errEl.classList.remove('visible');
@@ -352,6 +362,7 @@
                 errEl.classList.add('visible');
                 return;
             }
+            setupBusy = true;
             try {
                 const r = await fetch('/setup/token', {
                     method:'POST',
@@ -362,6 +373,8 @@
                 if (d.error) throw new Error(d.error);
                 showStep('wait');
                 document.getElementById('setup-wait-msg').textContent = 'Salvataggio token in corso…';
+                const btn = document.querySelector('#step-token button');
+                if (btn) { btn.disabled = true; btn.textContent = 'Invio in corso…'; }
                 pollSetup();
             } catch (e) {
                 errEl.textContent = e.message;
