@@ -1,0 +1,42 @@
+# Apple Music Unified (ARM64) — esempio di docker-compose
+#
+# Copia questo file in docker-compose.yml e adatta i percorsi.
+# Vedi README.md per istruzioni complete.
+
+services:
+  apple-music:
+    image: ghcr.io/ciux23/apple-music-unified:arm64
+    container_name: apple-music
+    restart: unless-stopped
+
+    # Necessario per il chroot del wrapper FPS
+    privileged: true
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+
+    ports:
+      - "8080:8080"
+
+    environment:
+      # UID/GID dell'utente proprietario dei file scaricati.
+      # Verifica con `id` sul tuo host.
+      - PUID=1000
+      - PGID=1000
+
+    volumes:
+      # Persistenza dei token (NON perdere questa cartella)
+      - ./wrapper-data:/app/rootfs/data
+      # Cartella di destinazione della musica (modifica il percorso)
+      - /percorso/musica:/downloads
+
+  # Opzionale: aggiornamento automatico dell'immagine
+  # watchtower:
+  #   image: nickfedor/watchtower:latest
+  #   container_name: watchtower
+  #   restart: unless-stopped
+  #   volumes:
+  #     - /var/run/docker.sock:/var/run/docker.sock
+  #   environment:
+  #     - WATCHTOWER_CLEANUP=true
+  #     - WATCHTOWER_POLL_INTERVAL=86400
