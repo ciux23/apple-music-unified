@@ -105,9 +105,9 @@ def convert_to_flac(job_id, keep_alac=False):
         # ffmpeg: copia audio in flac, copia tag e copertina
         cmd = [
             "ffmpeg", "-y", "-i", src,
+            "-map", "0:a", "-map", "0:v?", "-c:v", "copy",
             "-c:a", "flac", "-compression_level", "8",
             "-map_metadata", "0",
-            "-map", "0:v?", "-c:v", "copy",
             dst
         ]
         try:
