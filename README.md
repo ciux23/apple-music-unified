@@ -1,8 +1,8 @@
-# Apple Music Unified (ARM64)
+# Apple Music Unified
 
-Container Docker **ARM64 nativo** che scarica musica da Apple Music in **ALAC / Hi-Res Lossless / Dolby Atmos / AAC** tramite una **interfaccia web**.
+Container Docker multi-arch (**ARM64 + AMD64**) che scarica musica da Apple Music in **ALAC / Hi-Res Lossless / Dolby Atmos / AAC** tramite una **interfaccia web**.
 
-Nessuna emulazione QEMU. Nessun wrapper x86. Tutto gira nativo su ARM64 (Raspberry Pi 4/5, Apple Silicon, server ARM, OMV).
+Nessuna emulazione QEMU. Tutto gira **nativo** sulla tua architettura: ARM64 (Raspberry Pi 4/5, Apple Silicon, server ARM, OMV) oppure AMD64 (Intel, AMD, PC desktop, NAS x86).
 
 ---
 
@@ -12,7 +12,7 @@ Nessuna emulazione QEMU. Nessun wrapper x86. Tutto gira nativo su ARM64 (Raspber
 - 🌐 **Web UI integrata** (porta 8080): incolla URL, scegli qualità, guarda il progresso in tempo reale
 - 🎯 **Supporto artisti**: risolve la discografia e permette di selezionare quali album scaricare
 - 💾 **Organizzazione automatica**: `Artista/Album/NN. Titolo.m4a` con copertina e tag completi
-- ⚡ **ARM64 nativo**: compilato da sorgente per aarch64, nessuna emulazione
+- ⚡ **Multi-arch nativo**: compilato da sorgente per aarch64 e x86_64, nessuna emulazione
 - 📦 **Single container**: wrapper + downloader + web UI in un'unica immagine
 - 🔐 **Setup guidato da browser**: al primo avvio un wizard chiede email, password, 2FA e token
 - 💿 **Persistenza dei token**: dopo il primo login, i riavvii non richiedono più credenziali
@@ -24,18 +24,18 @@ Nessuna emulazione QEMU. Nessun wrapper x86. Tutto gira nativo su ARM64 (Raspber
 
 | Componente | Descrizione |
 |------------|-------------|
-| **Wrapper** | WorldObservationLog/wrapper compilato da sorgente per ARM64 |
-| **Downloader** | apmyx (Go, backend ARM64 nativo) |
+| **Wrapper** | WorldObservationLog/wrapper compilato da sorgente per ARM64 e AMD64 |
+| **Downloader** | apmyx (Go, backend nativo multi-arch) |
 | **Web UI** | Flask + JavaScript |
 | **Post-processing** | FFmpeg + MP4Box (GPAC via Homebrew) |
-| **Build** | GitHub Actions su runner ARM64 nativo |
+| **Build** | GitHub Actions multi-arch (ARM64 + AMD64) |
 
 ---
 
 ## Requisiti
 
-- Docker con supporto ARM64 (Docker 20+, kernel Linux aarch64)
-- Host ARM64 (Raspberry Pi 4/5, Apple Silicon, VPS ARM, server ARM)
+- Docker con supporto multi-arch (Docker 20+, BuildKit)
+- Host ARM64 o AMD64 (Raspberry Pi 4/5, Apple Silicon, VPS ARM, Intel/AMD)
 - Abbonamento Apple Music attivo
 - Almeno 3 GB di spazio per l'immagine
 
@@ -48,7 +48,7 @@ Nessuna emulazione QEMU. Nessun wrapper x86. Tutto gira nativo su ARM64 (Raspber
 ```yaml
 services:
   apple-music:
-    image: ghcr.io/ciux23/apple-music-unified:arm64
+    image: ghcr.io/ciux23/apple-music-unified:latest
     container_name: apple-music
     restart: unless-stopped
 
@@ -168,6 +168,6 @@ Questo progetto scarica contenuti protetti da DRM. Funziona **solo** con un abbo
 ## Crediti
 
 - WorldObservationLog/wrapper — wrapper FPS per la decrittografia
-- itouakirai/wrapper — fork con adattamenti ARM64
+- itouakirai/wrapper — fork con adattamenti ARM64 (per il binario main ARM64)
 - rwnk-12/apmyx-gui — downloader apmyx
 - glomatico/gamdl — ispirazione per la struttura di configurazione

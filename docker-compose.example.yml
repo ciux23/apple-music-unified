@@ -5,7 +5,7 @@
 
 services:
   apple-music:
-    image: ghcr.io/ciux23/apple-music-unified:arm64
+    image: ghcr.io/ciux23/apple-music-unified:latest
     container_name: apple-music
     restart: unless-stopped
 
