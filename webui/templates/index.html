@@ -31,7 +31,7 @@
 
         .form-panel {
             padding: 16px 24px; background: #141414; border-bottom: 1px solid #2a2a2a;
-            display: grid; grid-template-columns: 1fr auto auto; gap: 12px; align-items: end;
+            display: grid; grid-template-columns: 1fr auto auto auto; gap: 12px; align-items: end;
         }
         .field { display: flex; flex-direction: column; gap: 6px; }
         .field label { font-size: 11px; color: #888; text-transform: uppercase; letter-spacing: 0.5px; font-weight: 600; }
@@ -188,6 +188,14 @@
                 <option value="hires">Hi-Res 24/192</option>
                 <option value="aac">AAC 256k</option>
                 <option value="atmos">Atmos</option>
+            </select>
+        </div>
+        <div class="field">
+            <label>Formato</label>
+            <select id="output_format">
+                <option value="alac">ALAC (.m4a)</option>
+                <option value="flac">FLAC (converti)</option>
+                <option value="alac+flac">ALAC + FLAC</option>
             </select>
         </div>
         <div class="field">
@@ -509,10 +517,11 @@
             setProgress(0, 'Avvio…');
             autoScroll = true;
             try {
+                const output_format = document.getElementById('output_format').value;
                 const r = await fetch('/download', {
                     method:'POST',
                     headers:{'Content-Type':'application/json'},
-                    body: JSON.stringify({urls, quality})
+                    body: JSON.stringify({urls, quality, output_format})
                 });
                 const d = await r.json();
                 if (d.error) throw new Error(d.error);

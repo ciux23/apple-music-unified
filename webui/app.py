@@ -1,5 +1,5 @@
 from flask import Flask, render_template, request, jsonify
-import subprocess, threading, uuid, os, pty, select, re, json, time
+import subprocess, threading, uuid, os, pty, select, re, json, time, glob, shutil
 
 app = Flask(__name__)
 APMYX_BIN = "/app/apmyx"
@@ -85,7 +85,60 @@ def reader(job_id, master_fd, proc):
         job["status"] = "done"
         job["percent"] = 100
 
-def run_apmyx(job_id, urls, quality):
+
+def convert_to_flac(job_id, keep_alac=False):
+    """Converte tutti i .m4a in /downloads/ALAC/ in FLAC dentro /downloads/FLAC/.
+    Preserva struttura, tag e copertina. Se keep_alac è False, cancella gli .m4a."""
+    jobs[job_id]["log"] += "\n[FLAC] Conversione in corso...\n"
+    src_root = "/downloads/ALAC"
+    dst_root = "/downloads/FLAC"
+    files = glob.glob(os.path.join(src_root, "**", "*.m4a"), recursive=True)
+    if not files:
+        jobs[job_id]["log"] += "[FLAC] Nessun file da convertire.\n"
+        return
+    total = len(files)
+    jobs[job_id]["log"] += f"[FLAC] {total} file da convertire.\n"
+    for idx, src in enumerate(files, 1):
+        rel = os.path.relpath(src, src_root)
+        dst = os.path.join(dst_root, os.path.splitext(rel)[0] + ".flac")
+        os.makedirs(os.path.dirname(dst), exist_ok=True)
+        # ffmpeg: copia audio in flac, copia tag e copertina
+        cmd = [
+            "ffmpeg", "-y", "-i", src,
+            "-c:a", "flac", "-compression_level", "8",
+            "-map_metadata", "0",
+            "-map", "0:v?", "-c:v", "copy",
+            dst
+        ]
+        try:
+            result = subprocess.run(cmd, capture_output=True, text=True, timeout=600)
+            if result.returncode != 0:
+                jobs[job_id]["log"] += f"[FLAC] [{idx}/{total}] errore su {rel}: {result.stderr[-200:]}\n"
+                continue
+            jobs[job_id]["log"] += f"[FLAC] [{idx}/{total}] {rel} -> FLAC\n"
+            if not keep_alac:
+                os.remove(src)
+        except Exception as e:
+            jobs[job_id]["log"] += f"[FLAC] [{idx}/{total}] eccezione su {rel}: {e}\n"
+    # Rimuovi cartelle ALAC vuote
+    for root, dirs, files_ in os.walk(src_root, topdown=False):
+        if root == src_root:
+            continue
+        try:
+            if not os.listdir(root):
+                os.rmdir(root)
+        except OSError:
+            pass
+    if not keep_alac:
+        # Se ALAC è vuota, rimuovila
+        try:
+            if os.path.isdir(src_root) and not os.listdir(src_root):
+                os.rmdir(src_root)
+        except OSError:
+            pass
+    jobs[job_id]["log"] += "[FLAC] Conversione completata.\n"
+
+def run_apmyx(job_id, urls, quality, output_format='alac'):
     jobs[job_id] = {
         "status": "running", "log": "", "master_fd": None, "proc": None,
         "percent": 0, "track_num": 0, "total_tracks": 0,
@@ -110,6 +163,10 @@ def run_apmyx(job_id, urls, quality):
             jobs[job_id]["master_fd"] = master_fd
             jobs[job_id]["proc"] = proc
             reader(job_id, master_fd, proc)
+        # Conversione FLAC se richiesta
+        if output_format in ("flac", "alac+flac"):
+            keep = (output_format == "alac+flac")
+            convert_to_flac(job_id, keep_alac=keep)
     except Exception as e:
         jobs[job_id]["log"] += f"\n[ERRORE] {e}"
         jobs[job_id]["status"] = "error"
@@ -211,8 +268,9 @@ def download():
             return jsonify({"error": "URL mancante"}), 400
         urls = [url]
     quality = data.get("quality", "lossless")
+    output_format = data.get("output_format", "alac")
     jid = str(uuid.uuid4())
-    threading.Thread(target=run_apmyx, args=(jid, urls, quality), daemon=True).start()
+    threading.Thread(target=run_apmyx, args=(jid, urls, quality, output_format), daemon=True).start()
     return jsonify({"job_id": jid})
 
 @app.route("/log/<jid>")
