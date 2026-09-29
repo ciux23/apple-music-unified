@@ -16,6 +16,7 @@ Nessuna emulazione QEMU. Tutto gira **nativo** sulla tua architettura: ARM64 (Ra
 - 📦 **Single container**: wrapper + downloader + web UI in un'unica immagine
 - 🔐 **Setup guidato da browser**: al primo avvio un wizard chiede email, password, 2FA e token
 - 💿 **Persistenza dei token**: dopo il primo login, i riavvii non richiedono più credenziali
+- 🎼 **Conversione FLAC opzionale**: post-processing ffmpeg con copertina e tag preservati
 - 🐳 **Deploy con un compose**: pronto per Portainer, OMV, qualsiasi host Docker
 
 ---
@@ -67,6 +68,7 @@ services:
     volumes:
       - ./wrapper-data:/app/rootfs/data
       - /percorso/musica:/downloads
+```
 
 ### Avvio
 
@@ -102,7 +104,6 @@ Incolla il tuo `media-user-token`, che trovi nei cookie di Apple Music:
 
 Al termine, il container parte in modalità servizio e i token vengono salvati in `wrapper-data/`. Ai riavvii successivi **non verranno più chieste le credenziali**.
 
-
 ---
 
 ## Uso
@@ -111,10 +112,102 @@ Nella Web UI puoi:
 
 - **Incollare un URL Apple Music** (brano, album, playlist o artista)
 - **Scegliere la qualità**: Lossless, Hi-Res 24/192, AAC 256k, Dolby Atmos
+- **Scegliere il formato di output**: ALAC (.m4a), FLAC (convertito), oppure entrambi
 - **Per gli artisti**: selezionare dalla lista quali album scaricare
 - **Vedere il progresso** in tempo reale con barra e log completo
 
-I file vengono salvati in `/downloads/ALAC/Artista/Album/NN. Titolo.m4a` con copertina incorporata, tag ID3 completi e permessi `1000:1000` (o i valori `PUID`/`PGID` configurati).
+### Formati di output
+
+| Formato | Descrizione |
+|---------|-------------|
+| **ALAC** | File `.m4a` nativo (default Apple Music) |
+| **FLAC** | Conversione lossless con `ffmpeg`, copertina ridimensionata a 1400×1400, tag e testi preservati. Il file ALAC di partenza viene eliminato dopo la conversione |
+| **ALAC + FLAC** | Mantiene entrambi i formati |
+
+La conversione FLAC lavora solo sui **file appena scaricati**, non tocca la libreria esistente.
+
+I file vengono salvati in `/downloads/ALAC/Artista/Album/` (o `/downloads/FLAC/...`) con permessi `1000:1000` (o i valori `PUID`/`PGID` configurati).
+
+---
+
+## Modalità d'uso
+
+Il wrapper di decrittografia mantiene una sessione con Apple che, dopo diversi giorni di attività continua, può scadere e causare errori di playback. Per questo sono consigliate due modalità d'uso.
+
+### Modalità 1 — On-demand (consigliata)
+
+Avvii il container solo quando devi scaricare qualcosa, poi lo fermi.
+
+**Vantaggi:**
+- Zero consumo di risorse quando spento
+- Nessun rischio di sessione scaduta (il wrapper non resta mai attivo a lungo)
+- Nessuna configurazione aggiuntiva
+
+**Flusso:**
+1. Nella UI di OMV: **Services → Compose → apple-music → Up** (o `sudo docker start apple-music`)
+2. Attendi 20-30 secondi che il wrapper faccia login e vada in ascolto
+3. Apri la Web UI, scarica quello che ti serve
+4. Quando hai finito: **Services → Compose → apple-music → Down** (o `sudo docker stop apple-music`)
+
+### Modalità 2 — Always-on con autoheal
+
+Se vuoi il container sempre attivo, serve un sistema che lo riavvii quando la sessione del wrapper scade.
+
+**docker-compose.yml** (estratto delle parti rilevanti):
+
+```yaml
+services:
+  apple-music:
+    image: ghcr.io/ciux23/apple-music-unified:latest
+    container_name: apple-music
+    restart: unless-stopped
+    privileged: true
+    security_opt:
+      - seccomp:unconfined
+      - apparmor:unconfined
+    labels:
+      - autoheal=true
+    healthcheck:
+      test: ["CMD-SHELL", "curl -f http://localhost:8080/ || exit 1"]
+      interval: 60s
+      timeout: 10s
+      retries: 3
+      start_period: 60s
+    ports:
+      - "8080:8080"
+    environment:
+      - PUID=1000
+      - PGID=1000
+    volumes:
+      - ./wrapper-data:/app/rootfs/data
+      - /percorso/musica:/downloads
+
+  autoheal:
+    image: willfarrell/autoheal:latest
+    container_name: autoheal
+    restart: always
+    environment:
+      - AUTOHEAL_CONTAINER_LABEL=all
+      - AUTOHEAL_INTERVAL=30
+    volumes:
+      - /var/run/docker.sock:/var/run/docker.sock
+```
+
+**Come funziona:** ogni 60 secondi Docker verifica che la Web UI risponda. Dopo 3 fallimenti consecutivi il container viene marcato `unhealthy`. `autoheal` lo rileva e lo riavvia automaticamente, ripristinando la sessione del wrapper.
+
+**Alternativa senza autoheal:** un cron job sul host che riavvia il container ogni 24 ore.
+
+```bash
+0 4 * * * /usr/bin/docker restart apple-music
+```
+
+### Quale scegliere
+
+| Modalità | Quando usarla | Complessità |
+|----------|---------------|-------------|
+| **On-demand** | Uso manuale, scarichi occasionali | Bassa |
+| **Always-on + autoheal** | Download automatici, uso frequente | Alta |
+| **Always-on + cron restart** | Always-on ma senza container extra | Media |
 
 ---
 
@@ -124,7 +217,7 @@ L'immagine viene **buildata automaticamente** ad ogni push su `main` tramite Git
 
 ### Con watchtower
 
-Se hai [watchtower](https://github.com/nickfedor/watchtower) attivo sull'host, aggiungi il container `apple-music` al suo monitoraggio:
+Se hai [watchtower](https://github.com/nickfedor/watchtower) attivo sull'host:
 
 ```yaml
 services:
@@ -154,6 +247,7 @@ docker exec -it watchtower /watchtower --run-once apple-music
 ```bash
 docker compose pull && docker compose up -d
 ```
+
 ---
 
 ## Note legali e disclaimer
