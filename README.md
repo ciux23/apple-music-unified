@@ -120,7 +120,11 @@ I file vengono salvati in `/downloads/ALAC/Artista/Album/NN. Titolo.m4a` con cop
 
 ## Aggiornamenti
 
-L'immagine viene **buildata automaticamente** ad ogni push su `main` tramite GitHub Actions. Con watchtower attivo sull'host:
+L'immagine viene **buildata automaticamente** ad ogni push su `main` tramite GitHub Actions, con supporto multi-arch (ARM64 + AMD64).
+
+### Con watchtower
+
+Se hai [watchtower](https://github.com/nickfedor/watchtower) attivo sull'host, aggiungi il container `apple-music` al suo monitoraggio:
 
 ```yaml
 services:
@@ -134,12 +138,22 @@ services:
       - WATCHTOWER_POLL_INTERVAL=86400
 ```
 
-Oppure aggiornamento manuale:
+Oppure forza un aggiornamento immediato:
+
+```bash
+docker exec -it watchtower /watchtower --run-once apple-music
+```
+
+### Manuale (via UI OMV)
+
+1. **Services → Compose → Files → apple-music → Pull** (scarica l'immagine nuova)
+2. **Services → Compose → Files → apple-music → Up** (ricrea il container)
+
+### Manuale (riga di comando)
 
 ```bash
 docker compose pull && docker compose up -d
 ```
-
 ---
 
 ## Note legali e disclaimer
